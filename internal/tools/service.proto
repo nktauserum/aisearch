@@ -1,0 +1,21 @@
+syntax = "proto3";
+option go_package = "internal/tools";
+
+package extractservice;
+
+service ExtractService {
+  // Метод extract принимает запрос с URL и возвращает ответ с результатом.
+  rpc Extract(ExtractRequest) returns (ExtractResponse);
+}
+
+// Запрос содержит URL.
+message ExtractRequest {
+  string url = 1;
+}
+
+// Ответ содержит результат выполнения extract.
+message ExtractResponse {
+  string title = 1;
+  string sitename = 2;
+  string text = 3;
+}
