@@ -11,7 +11,6 @@ import (
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
-	unsafe "unsafe"
 )
 
 const (
@@ -158,7 +157,7 @@ var (
 
 func file_internal_tools_service_proto_rawDescGZIP() []byte {
 	file_internal_tools_service_proto_rawDescOnce.Do(func() {
-		file_internal_tools_service_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_internal_tools_service_proto_rawDesc), len(file_internal_tools_service_proto_rawDesc)))
+		file_internal_tools_service_proto_rawDescData = protoimpl.X.CompressGZIP([]byte(file_internal_tools_service_proto_rawDesc))
 	})
 	return file_internal_tools_service_proto_rawDescData
 }
@@ -187,7 +186,7 @@ func file_internal_tools_service_proto_init() {
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_tools_service_proto_rawDesc), len(file_internal_tools_service_proto_rawDesc)),
+			RawDescriptor: []byte(file_internal_tools_service_proto_rawDesc),
 			NumEnums:      0,
 			NumMessages:   2,
 			NumExtensions: 0,

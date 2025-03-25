@@ -23,6 +23,14 @@ var search_query_prompt = `Вы интеллектуальный помощни�
 
 `
 
+var refine_query_prompt = `Вы интеллектуальный помощник, часть сервиса по поиску в интернете.
+
+В качестве ответа возвращайте три готовых поисковых запроса. Рекомендуется убирать ненужные эпитеты. Отвечайте корректно и соблюдайте орфографические нормы. Разделяйте запросы одним символом ";". Не заканчивайте предложение точкой. Старайтесь охватить как можно больше информации о вопросе, составляя запросы, но не затрагивайте лишние темы.
+
+Пример ответа на запрос "Посоветуй какие-нибудь книги о диком Западе": "дикий запад книги;книги в жанре вестерн;литература о ковбоях".
+
+Пример ответа на запрос "Расскажи об австрийской экономической школе": "австрийская экономическая школа;экономисты австрийской экономической школы;либертарианство принципы".`
+
 func GetSearchInfo(question string) (string, error) {
 	//resultChan := make(chan []string, 1)
 
@@ -44,7 +52,7 @@ func GetSearchInfo(question string) (string, error) {
 }
 
 func GenerateRefineQueries(ctx context.Context, old_conversation *models.Conversation, query string) ([]string, error) {
-	conversation := client.NewConversation(search_query_prompt)
+	conversation := client.NewConversation(refine_query_prompt)
 	messages := old_conversation.GetMessages()
 
 	// Проверяем, есть ли хотя бы два элемента, чтобы безопасно срезать массив.
@@ -120,11 +128,20 @@ func DoSearchQueries(queries []string) ([]string, error) {
 	var allResults []string
 	var firstErr error
 
+	// Create a map to track unique URLs
+	uniqueURLs := make(map[string]bool)
+
 	for r := range result {
 		if r.err != nil && firstErr == nil {
 			firstErr = r.err
 		}
-		allResults = append(allResults, r.res...)
+		// Check each URL and only append if it's unique
+		for _, url := range r.res {
+			if !uniqueURLs[url] {
+				uniqueURLs[url] = true
+				allResults = append(allResults, url)
+			}
+		}
 	}
 
 	return allResults, firstErr

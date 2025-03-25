@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/nktauserum/aisearch/pkg/ai/models"
+	"github.com/nktauserum/aisearch/pkg/parser"
 	"github.com/nktauserum/aisearch/shared"
 )
 
@@ -23,19 +24,19 @@ func Search(ctx context.Context, queries ...string) ([]shared.Website, error) {
 	// Собираем контент с сайтов асинхронно
 	ch := make(chan shared.Website)
 	for _, url := range urls {
-		ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
-		defer cancel()
-		go func(url string) {
+		go func(ctx context.Context, url string) {
 			//defer log.Printf("done %s\n", url)
+			ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+			defer cancel()
 			log.Printf("сайт %s\n", url)
-			siteInfo, err := GetContent(ctx, url)
+			siteInfo, err := parser.GetContent(ctx, url)
 			if err != nil {
 				fmt.Println(err)
 				ch <- shared.Website{}
 				return
 			}
 			ch <- siteInfo
-		}(url)
+		}(ctx, url)
 	}
 
 	var content []shared.Website

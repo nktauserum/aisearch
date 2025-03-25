@@ -24,6 +24,7 @@ func NewClient() (*grpc.ClientConn, error) {
 }
 
 func GetWebResourceContent(ctx context.Context, url string) (*ExtractResponse, error) {
+
 	conn, err := NewClient()
 	if err != nil {
 		log.Printf("error connecting to grpc server: %v", err)
