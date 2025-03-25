@@ -22,8 +22,9 @@ func Search(ctx context.Context, queries ...string) ([]shared.Website, error) {
 	}
 
 	// Собираем контент с сайтов асинхронно
-	ch := make(chan shared.Website)
+	ch := make(chan shared.Website, len(urls))
 	for _, url := range urls {
+		url := url // Create a new instance of url for each iteration
 		go func(ctx context.Context, url string) {
 			//defer log.Printf("done %s\n", url)
 			ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
