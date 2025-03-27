@@ -52,17 +52,19 @@ func RefineSearchHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	content, err := answer.Search(ctx, queries...)
-	if err != nil {
-		mw.ErrorHandler(w, err, http.StatusInternalServerError)
-		return
-	}
-	log.Println("analyzing is done")
-
 	var builder strings.Builder
 	builder.WriteString(fmt.Sprintf("Запрос: %s\n\n", request.Query))
-	for _, site := range content {
-		builder.WriteString(fmt.Sprintf("Title: %s\nWeb-ресурс: %s\nТекст: %s\n\n", site.Title, site.Sitename, site.Content))
+	if queries != nil {
+		content, err := answer.Search(ctx, queries...)
+		if err != nil {
+			mw.ErrorHandler(w, err, http.StatusInternalServerError)
+			return
+		}
+		log.Println("analyzing is done")
+
+		for _, site := range content {
+			builder.WriteString(fmt.Sprintf("Title: %s\nWeb-ресурс: %s\nТекст: %s\n\n", site.Title, site.Sitename, site.Content))
+		}
 	}
 
 	answer, err := answer.Research(ctx, conversation, builder.String())

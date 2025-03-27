@@ -1,8 +1,14 @@
 package models
 
 import (
+	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"log"
+	"net/http"
+	"strings"
 
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
@@ -70,10 +76,74 @@ func (c *Conversation) Continue(ctx context.Context, message Message) (string, e
 	return chatCompletion.Choices[0].Message.Content, nil
 }
 
+func (c *Conversation) Stream(ctx context.Context, message Message, result chan string) error {
+	var response *http.Response
+
+	messages := c.GetMessages()
+	if message.ImageURL != nil {
+		*messages = append(*messages, openai.UserMessageParts(openai.ImagePart(message.ImageURL.URL)))
+	} else {
+		*messages = append(*messages, openai.UserMessageParts(openai.TextPart(message.Text)))
+	}
+
+	stream := c.Client.Chat.Completions.NewStreaming(ctx, c.Params, option.WithResponseInto(&response))
+
+	if stream.Err() != nil {
+		return stream.Err()
+	}
+
+	var sb strings.Builder
+
+	go func() {
+		defer close(result)         // Закрываем канал после завершения работы
+		defer response.Body.Close() // Закрываем тело ответа
+
+		reader := bufio.NewReader(response.Body)
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				line, err := reader.ReadString('\n')
+				if err != nil {
+					if err == io.EOF {
+						c.Params.Messages.Value = append(c.Params.Messages.Value, openai.AssistantMessage(sb.String()))
+						return
+					}
+					fmt.Println("Ошибка при чтении из потока:", err)
+					return
+				}
+
+				line = strings.TrimPrefix(line, "data: ")
+				sb.WriteString(line)
+
+				var chunk Chunk
+				err = json.Unmarshal([]byte(line), &chunk)
+				if err != nil {
+					continue
+				}
+
+				if len(chunk.Choices) > 0 {
+					content, err := json.Marshal(Response{Content: chunk.Choices[0].Delta.Content})
+					if err != nil {
+						log.Printf("error marshalling response: %v", err)
+						return
+					}
+
+					result <- string(content)
+				}
+			}
+		}
+	}()
+
+	return nil
+}
+
 type User struct {
 	ID       int64
 	Username string
 	Email    string
-	password string
+	Password string
 	Userpic  string
 }

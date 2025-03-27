@@ -10,6 +10,7 @@ import (
 
 // возвращает указатель на новый объект Conversation.
 // TODO: Добавить возможность создания объекта вместе с переданным пользователем
+// ^ что это за херня?
 func NewConversation(system_prompt ...string) *models.Conversation {
 	config := config.GetConfig()
 

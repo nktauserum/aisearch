@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/nktauserum/aisearch/pkg/ai/models"
@@ -21,28 +22,56 @@ func Search(ctx context.Context, queries ...string) ([]shared.Website, error) {
 		return nil, err
 	}
 
-	// Собираем контент с сайтов асинхронно
+	// Create a timeout for the entire search
+	ctxWithTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
 	ch := make(chan shared.Website, len(urls))
+	urlChan := make(chan string, len(urls))
+
+	// Send URLs to the channel
 	for _, url := range urls {
-		url := url // Create a new instance of url for each iteration
+		urlChan <- url
+	}
+	close(urlChan)
+
+	var wg sync.WaitGroup
+	for _, url := range urls {
+		wg.Add(1)
 		go func(ctx context.Context, url string) {
-			//defer log.Printf("done %s\n", url)
-			ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
-			defer cancel()
+			defer wg.Done()
+
+			// start := time.Now()
 			log.Printf("сайт %s\n", url)
+
 			siteInfo, err := parser.GetContent(ctx, url)
 			if err != nil {
 				fmt.Println(err)
 				ch <- shared.Website{}
+				//log.Printf("done %s in %.3f\n", url, time.Since(start).Seconds())
 				return
 			}
+
+			select {
+			case <-ctx.Done():
+				log.Printf("content deadline exceeded: %s", url)
+				return
+			default:
+			}
+
 			ch <- siteInfo
-		}(ctx, url)
+			// log.Printf("done %s in %.3f\n", url, time.Since(start).Seconds())
+		}(ctxWithTimeout, url)
 	}
 
+	go func() {
+		wg.Wait()
+		close(ch)
+	}()
+
 	var content []shared.Website
-	for range urls {
-		if siteInfo := <-ch; siteInfo.URL != "" {
+	for siteInfo := range ch {
+		if siteInfo.URL != "" {
 			content = append(content, siteInfo)
 		}
 	}
@@ -61,7 +90,7 @@ func Research(ctx context.Context, conversation *models.Conversation, content st
 
 	// Write summary to file
 	go func(context string) {
-		filename := fmt.Sprintf("content/summary_%d.txt", time.Now().Unix())
+		filename := fmt.Sprintf("content/summary_%d.md", time.Now().Unix())
 		err = os.WriteFile(filename, []byte(context), 0644)
 		if err != nil {
 			log.Printf("error writing summary to file: %v", err)

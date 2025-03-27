@@ -1,7 +1,8 @@
 package shared
 
 type SearchRequest struct {
-	Query string `json:"query"`
+	Query      string `json:"query"`
+	FormatMode string `json:"format_mode,omitempty"`
 }
 
 type SearchResponse struct {

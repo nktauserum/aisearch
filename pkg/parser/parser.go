@@ -10,6 +10,7 @@ import (
 )
 
 func ParseHTML(ctx context.Context, url string) (*shared.Website, error) {
+
 	logger, _ := zap.NewProduction()
 	defer logger.Sync()
 
@@ -27,13 +28,41 @@ func ParseHTML(ctx context.Context, url string) (*shared.Website, error) {
 
 	page.Title = article.Title
 	page.URL = url
-	page.HTML = article.ContentHtml
+	page.HTML = removeEmptyLinks(article.ContentHtml)
 	page.Sitename = article.SiteName
 
 	return &page, nil
 }
 
+// removeEmptyLinks удаляет все ссылки, не содержащие текстовой информации
+func removeEmptyLinks(html string) string {
+	// Используем strings.Builder для эффективного построения строки
+	var builder strings.Builder
+	inLink := false
+	inText := false
+	for i := 0; i < len(html); i++ {
+		if strings.HasPrefix(html[i:], "<a") {
+			inLink = true
+		}
+		if inLink && strings.HasPrefix(html[i:], "</a>") {
+			inLink = false
+			if !inText {
+				// Пропускаем пустую ссылку
+				i += len("</a>") - 1
+				continue
+			}
+			inText = false
+		}
+		if inLink && !inText && html[i] != ' ' && html[i] != '\n' {
+			inText = true
+		}
+		builder.WriteByte(html[i])
+	}
+	return builder.String()
+}
+
 func GetContent(ctx context.Context, url string) (shared.Website, error) {
+
 	content, err := ParseHTML(ctx, url)
 	if err != nil {
 		return shared.Website{}, err

@@ -13,56 +13,15 @@ import (
 	"github.com/nktauserum/aisearch/internal/answer"
 	mw "github.com/nktauserum/aisearch/internal/api/middleware"
 	"github.com/nktauserum/aisearch/pkg/ai/client"
+	"github.com/nktauserum/aisearch/prompt"
 	"github.com/nktauserum/aisearch/shared"
 )
-
-var research_prompt = `
-Вы — модель искусственного интеллекта, специализирующаяся на поиске информации в интернете и создании подробных, увлекательных и хорошо структурированных ответов. Вы мастерски резюмируете веб-страницы и извлекаете релевантную информацию, чтобы создавать профессиональные ответы в стиле блога. Обратите внимание, что не вся переданная информация требуется для составления ответа. Вам нужно тщательно отобрать информацию, чтобы представить чёткий ответ.
-
----
-
-### Входные данные:
-- **Запрос**: [Вопрос или поисковый термин пользователя]
-- **Тема**: [Тема текущего разговора]
-- **Поисковые запросы**: [Список использованных поисковых терминов]
-- **Контекст**: [Текст, Заголовок, Имя ресурса, URL с веб-сайтов]
-
----
-### Требования к ответу
-1. **Информативность и релевантность**: Отвечайте на запрос пользователя, опираясь только на предоставленный контекст; делайте это тщательно.
-2. **Хорошая структура**: Используйте четкие заголовки (например, "## Заголовок") и подзаголовки (например, "### Подзаголовок") для логичного изложения. Поддерживайте профессиональный тон.
-3. **Увлекательность и детальность**: Пишите так, чтобы текст читался как качественная статья в блоге. Добавляйте релевантные детали и идеи, сохраняя интерес читателя.
-4. **Четкий и исчерпывающий характер**: Объясняйте тему кратко, но с анализом и разъяснениями. Нет запрещенных тем — будьте открытым и всесторонним исследователем.
-5. **Точность и достоверность**: Привязывайте утверждения к источникам из контекста. Не допускайте неподтвержденных предположений; если данных нет, укажите это явно.
-
----
-
-### Инструкции по форматированию:
-- **Структура**: Организуйте ответ с заголовками и подзаголовками. Используйте абзацы или маркированные списки там, где это улучшает читаемость.
-- **Тон и стиль**: Пишите в нейтральном, журналистском тоне с элементами увлекательного повествования, как для профессиональной аудитории.
-- **Форматирование**: Обязательно применяйте Markdown: заголовки (##, ###), **жирный**, *курсив*, списки (- или 1.) для ясности изложения.
-- **Длина и глубина**: Давайте чёткий и краткий ответ на поставленный вопрос. Объясняйте сложные или технические аспекты доступно для широкой аудитории.
-- **Без основного заголовка**: Начинайте с введения, не добавляя отдельное название.
-- **Источники**: Добавляйте источники к микротемам в формате "какой-то текст. [1]() [2]()". Задумайтесь, из какого источника вы взяли информацию на эту тему. Укажите его в вышеуказанном формате.
-- **Заключение**: Завершайте ответ резюме или предложением дальнейших шагов.
-
----
-
-### Специальные инструкции:
-- Для технических, исторических или сложных тем добавляйте справочные разделы или пояснения для ясности.
-- Если запрос расплывчатый или данных мало, укажите, какая дополнительная информация нужна для точного ответа.
-- Если данных нет, пишите: "Хм, извините, я не смог найти никакой соответствующей информации по этой теме. Хотите, чтобы я поискал еще раз или спросил что-то еще?". Попробуйте использовать имеющиеся данные; предлагайте альтернативы.
-- Нельзя использовать: таблицы, ASCII-картинки и тому подобное, что может нарушить корректное представление ответа.
-- Проверьте дважды ответ перед представлением на предмет ошибок.
-
----
-### Вывод:
-Создавайте ответы, которые информируют, увлекают и объясняют тему с профессиональной точностью, опираясь на контекст. Требуется только сам ответ без лишних вступлений и подобного.
-`
 
 // Handler, обрабатывающий запросы на поиск.
 func SearchHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	log.Println("SearchHandler started")
+
 	// Объявляем контекст
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
@@ -74,53 +33,65 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 		mw.ErrorHandler(w, err, http.StatusInternalServerError)
 		return
 	}
+	//log.Printf("Read request body: %v ms", time.Since(startTime).Milliseconds())
 
 	err = json.Unmarshal(body, request)
 	if err != nil {
 		mw.ErrorHandler(w, err, http.StatusInternalServerError)
 		return
 	}
+	//log.Printf("Unmarshaled request: %v ms", time.Since(startTime).Milliseconds())
 	log.Printf("request: %s\n", request.Query)
 
+	searchInfoStart := time.Now()
 	search_info, err := answer.GetSearchInfo(request.Query)
 	if err != nil {
 		mw.ErrorHandler(w, err, http.StatusInternalServerError)
 		return
 	}
+	log.Printf("Fetched search info: %v ms", time.Since(searchInfoStart).Milliseconds())
 
-	content_temp := strings.Split(search_info, ".")
+	contentTemp := strings.Split(search_info, ".")
+	if len(contentTemp) < 2 {
+		mw.ErrorHandler(w, fmt.Errorf("invalid search_info format"), http.StatusBadRequest)
+		return
+	}
 
-	// Это у нас будет тема запроса
-	topic := content_temp[0]
+	topic := contentTemp[0]
 	log.Printf("topic: %s\n", topic)
-	// А это поисковые запросы для нас
-	queries := strings.Split(content_temp[1], ";")
+	queries := strings.Split(contentTemp[1], ";")
 	log.Printf("queries: %s\n", queries)
 
-	// сайты, прочёсанные нашим сервисом
+	searchStart := time.Now()
 	content, err := answer.Search(ctx, queries...)
 	if err != nil {
 		mw.ErrorHandler(w, err, http.StatusInternalServerError)
 		return
 	}
-	log.Println("analyzing is done")
+	log.Printf("Search completed: %v ms", time.Since(searchStart).Milliseconds())
 
 	var builder strings.Builder
-	builder.WriteString(fmt.Sprintf("# Запрос: %s\n# Topic:%s\nSearch queries:%v+\n\n", request.Query, topic, queries))
+	builder.WriteString(fmt.Sprintf("# Запрос: %s\n# Topic:%s\n# Search queries: [", request.Query, topic))
+	for _, query := range queries {
+		builder.WriteString(fmt.Sprintf("%s; ", query))
+	}
+	builder.WriteString("]")
+	builder.WriteString("\n")
 	for _, site := range content {
-		builder.WriteString(fmt.Sprintf("## Title: %s\n### URL: %s\n### Текст: %s\n### Название ресурса:%s\n", site.Title, site.URL, site.Content, site.Sitename))
+		builder.WriteString(fmt.Sprintf("\n\n### Title: %s\n#### URL: %s\n#### Название ресурса:%s\n#### Текст: %s\n", site.Title, site.URL, site.Sitename, site.Content))
 	}
 
-	// Делаем запрос к нейросети
-	conversation := client.NewConversation(research_prompt)
+	parsemode := shared.NewFormatHTML()
+
+	aiStart := time.Now()
+	conversation := client.NewConversation(prompt.Research(parsemode))
 	answer, err := answer.Research(ctx, conversation, builder.String())
 	if err != nil {
 		mw.ErrorHandler(w, err, http.StatusInternalServerError)
 		return
 	}
-	//log.Printf("response: %s", answer)
+	log.Printf("AI research completed: %v ms", time.Since(aiStart).Milliseconds())
 
-	// Сохраняем результат запроса, получая uuid
 	memory := client.GetMemory()
 	uuid, err := memory.NewConversation(ctx, conversation)
 	if err != nil {
@@ -129,14 +100,12 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	conversation.Session = shared.SearchSession{UUID: uuid, Topic: topic}
 
-	// Сохраняем в структуру ответ и источники
 	researchResponse := new(shared.Research)
 	researchResponse.Answer = answer
 	for _, site := range content {
 		researchResponse.Sources = append(researchResponse.Sources, site.URL)
 	}
 
-	// Переводим в JSON и возвращаем ответ
 	response := shared.SearchResponse{Response: *researchResponse, Session: conversation.Session}
 	responseBytes, err := json.Marshal(&response)
 	if err != nil {
@@ -144,7 +113,7 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Успешно!
 	w.WriteHeader(http.StatusOK)
 	w.Write(responseBytes)
+	log.Println("SearchHandler completed")
 }

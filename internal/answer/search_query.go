@@ -11,25 +11,8 @@ import (
 	"github.com/nktauserum/aisearch/internal/search"
 	"github.com/nktauserum/aisearch/pkg/ai/client"
 	"github.com/nktauserum/aisearch/pkg/ai/models"
+	"github.com/nktauserum/aisearch/prompt"
 )
-
-var search_query_prompt = `Вы интеллектуальный помощник, часть сервиса по поиску в интернете.
-
-В качестве ответа возвращайте три готовых поисковых запроса и развернутую тему (current topic). Рекомендуется убирать ненужные эпитеты. Отвечайте корректно и соблюдайте орфографические нормы. В начале следует тема запроса, далее поисковые запросы, отделенные точкой, как в примере. Разделяйте запросы одним символом ";". Не заканчивайте предложение точкой. Старайтесь охватить как можно больше информации о вопросе, составляя запросы.
-
-Пример ответа на запрос "Посоветуй какие-нибудь книги о диком Западе": "Книги о Диком Западе.дикий запад книги;книги в жанре вестерн;литература о ковбоях".
-
-Пример ответа на запрос "Расскажи об австрийской экономической школе": "Австрийская экономическая школа: история и принципы.австрийская экономическая школа;экономисты австрийской экономической школы;либертарианство принципы".
-
-`
-
-var refine_query_prompt = `Вы интеллектуальный помощник, часть сервиса по поиску в интернете.
-
-В качестве ответа возвращайте три готовых поисковых запроса. Рекомендуется убирать ненужные эпитеты. Отвечайте корректно и соблюдайте орфографические нормы. Разделяйте запросы одним символом ";". Не заканчивайте предложение точкой. Старайтесь охватить как можно больше информации о вопросе, составляя запросы, но не затрагивайте лишние темы.
-
-Пример ответа на запрос "Посоветуй какие-нибудь книги о диком Западе": "дикий запад книги;книги в жанре вестерн;литература о ковбоях".
-
-Пример ответа на запрос "Расскажи об австрийской экономической школе": "австрийская экономическая школа;экономисты австрийской экономической школы;либертарианство принципы".`
 
 func GetSearchInfo(question string) (string, error) {
 	//resultChan := make(chan []string, 1)
@@ -38,10 +21,10 @@ func GetSearchInfo(question string) (string, error) {
 		return "", fmt.Errorf("question equals nil")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	conversation := client.NewConversation(search_query_prompt)
+	conversation := client.NewConversation(prompt.SearchQuery())
 	result, err := conversation.Continue(ctx, models.Message{Text: question})
 	if err != nil {
 		log.Printf("error getting search queries: %v", err)
@@ -52,7 +35,7 @@ func GetSearchInfo(question string) (string, error) {
 }
 
 func GenerateRefineQueries(ctx context.Context, old_conversation *models.Conversation, query string) ([]string, error) {
-	conversation := client.NewConversation(refine_query_prompt)
+	conversation := client.NewConversation(prompt.RefineQuery())
 	messages := old_conversation.GetMessages()
 
 	// Проверяем, есть ли хотя бы два элемента, чтобы безопасно срезать массив.
@@ -65,8 +48,12 @@ func GenerateRefineQueries(ctx context.Context, old_conversation *models.Convers
 	if err != nil {
 		return nil, err
 	}
-	content_temp := strings.Split(result, ".")
-	queries := strings.Split(content_temp[1], ";")
+
+	if strings.Contains(result, "not_needed") {
+		return nil, nil
+	}
+
+	queries := strings.Split(result, ";")
 	log.Printf("refine queries: %s\n", queries)
 
 	return queries, nil

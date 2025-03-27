@@ -15,7 +15,7 @@ func SearchTavily(query string) ([]shared.Source, error) {
 
 	r := new(shared.TavilyRequest)
 	r.Query = query + " -site:youtube.com -site:yandex.ru/video -site:vk.com"
-	r.NumResult = 5
+	r.NumResult = 3
 	r.Answer = false
 
 	request, err := json.Marshal(&r)
