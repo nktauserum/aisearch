@@ -2,11 +2,16 @@ package mw
 
 import (
 	"log"
-	"net/http"
+
+	"github.com/gin-gonic/gin"
 )
 
-func ErrorHandler(w http.ResponseWriter, err error, statusCode int) {
+type Error struct {
+	Error string `json:"error"`
+}
+
+func ErrorHandler(c *gin.Context, err error, statusCode int) {
 	// Обрабатываем ошибку
 	log.Printf("%d error: %v\n", statusCode, err)
-	w.WriteHeader(statusCode)
+	c.JSON(statusCode, Error{Error: err.Error()})
 }

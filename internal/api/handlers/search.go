@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/nktauserum/aisearch/internal/answer"
 	mw "github.com/nktauserum/aisearch/internal/api/middleware"
 	"github.com/nktauserum/aisearch/pkg/ai/client"
@@ -18,8 +19,8 @@ import (
 )
 
 // Handler, обрабатывающий запросы на поиск.
-func SearchHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+func SearchHandler(c *gin.Context) {
+	c.Writer.Header().Set("Content-Type", "application/json")
 	log.Println("SearchHandler started")
 
 	// Объявляем контекст
@@ -28,16 +29,16 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Обрабатываем запрос пользователя
 	request := new(shared.SearchRequest)
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
-		mw.ErrorHandler(w, err, http.StatusInternalServerError)
+		mw.ErrorHandler(c, err, http.StatusInternalServerError)
 		return
 	}
 	//log.Printf("Read request body: %v ms", time.Since(startTime).Milliseconds())
 
 	err = json.Unmarshal(body, request)
 	if err != nil {
-		mw.ErrorHandler(w, err, http.StatusInternalServerError)
+		mw.ErrorHandler(c, err, http.StatusInternalServerError)
 		return
 	}
 	//log.Printf("Unmarshaled request: %v ms", time.Since(startTime).Milliseconds())
@@ -46,14 +47,14 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 	searchInfoStart := time.Now()
 	search_info, err := answer.GetSearchInfo(request.Query)
 	if err != nil {
-		mw.ErrorHandler(w, err, http.StatusInternalServerError)
+		mw.ErrorHandler(c, err, http.StatusInternalServerError)
 		return
 	}
 	log.Printf("Fetched search info: %v ms", time.Since(searchInfoStart).Milliseconds())
 
 	contentTemp := strings.Split(search_info, ".")
 	if len(contentTemp) < 2 {
-		mw.ErrorHandler(w, fmt.Errorf("invalid search_info format"), http.StatusBadRequest)
+		mw.ErrorHandler(c, fmt.Errorf("invalid search_info format"), http.StatusBadRequest)
 		return
 	}
 
@@ -65,7 +66,7 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 	searchStart := time.Now()
 	content, err := answer.Search(ctx, queries...)
 	if err != nil {
-		mw.ErrorHandler(w, err, http.StatusInternalServerError)
+		mw.ErrorHandler(c, err, http.StatusInternalServerError)
 		return
 	}
 	log.Printf("Search completed: %v ms", time.Since(searchStart).Milliseconds())
@@ -87,7 +88,7 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 	conversation := client.NewConversation(prompt.Research(parsemode))
 	answer, err := answer.Research(ctx, conversation, builder.String())
 	if err != nil {
-		mw.ErrorHandler(w, err, http.StatusInternalServerError)
+		mw.ErrorHandler(c, err, http.StatusInternalServerError)
 		return
 	}
 	log.Printf("AI research completed: %v ms", time.Since(aiStart).Milliseconds())
@@ -95,7 +96,7 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 	memory := client.GetMemory()
 	uuid, err := memory.NewConversation(ctx, conversation)
 	if err != nil {
-		mw.ErrorHandler(w, err, http.StatusInternalServerError)
+		mw.ErrorHandler(c, err, http.StatusInternalServerError)
 		return
 	}
 	conversation.Session = shared.SearchSession{UUID: uuid, Topic: topic}
@@ -107,13 +108,12 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response := shared.SearchResponse{Response: *researchResponse, Session: conversation.Session}
-	responseBytes, err := json.Marshal(&response)
-	if err != nil {
-		mw.ErrorHandler(w, err, http.StatusInternalServerError)
-		return
-	}
+	// responseBytes, err := json.Marshal(&response)
+	// if err != nil {
+	// 	mw.ErrorHandler(c, err, http.StatusInternalServerError)
+	// 	return
+	// }
 
-	w.WriteHeader(http.StatusOK)
-	w.Write(responseBytes)
+	c.JSON(http.StatusOK, response)
 	log.Println("SearchHandler completed")
 }

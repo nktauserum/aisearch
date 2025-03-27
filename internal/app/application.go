@@ -3,12 +3,10 @@ package app
 import (
 	"fmt"
 	"log"
-	"net/http"
 
-	"github.com/gorilla/mux"
+	"github.com/gin-gonic/gin"
 
 	"github.com/nktauserum/aisearch/internal/api/handlers"
-	mw "github.com/nktauserum/aisearch/internal/api/middleware"
 )
 
 type Application struct {
@@ -24,25 +22,24 @@ func NewApplication(port int) *Application {
 func (a *Application) Run() error {
 	log.Println("Приложение запущено")
 
-	mux := mux.NewRouter()
+	r := gin.Default()
 
 	// index.html ))
-	mux.HandleFunc("/", mw.LogHandler(handlers.IndexHandler))
+	r.GET("/", handlers.IndexHandler)
 
-	// Базовый поисковый запрос
-	mux.HandleFunc("/api/v1/search", mw.LogHandler(handlers.SearchHandler)).Methods("POST")
+	r.POST("/api/v1/search", handlers.SearchHandler)
 
 	// Список текущих сохранённых сессий поиска
-	mux.HandleFunc("/internal/sessions", mw.LogHandler(handlers.SessionListHandler)).Methods("GET")
+	r.GET("/internal/sessions", handlers.SessionListHandler)
 
 	// Уточняющие запросы в рамках текущей сессии поиска
-	mux.HandleFunc("/api/v1/refine", mw.LogHandler(handlers.RefineSearchHandler)).Methods("POST")
+	r.POST("/api/v1/refine", handlers.RefineSearchHandler)
 
 	// Получение истории поиска для конкретной сессии
-	//mux.HandleFunc("/api/v1/search/{sessionId}/history", mw.LogHandler(handlers.SearchHistoryHandler)).Methods("GET")
+	// r.GET("/api/v1/search/:sessionId/history", mw.GinLogMiddleware(), handlers.SearchHistoryHandler)
 
 	// Получение контекста текущей сессии поиска
-	//mux.HandleFunc("/api/v1/search/{sessionId}", mw.LogHandler(handlers.SearchSessionHandler)).Methods("GET")
+	// r.GET("/api/v1/search/:sessionId", mw.GinLogMiddleware(), handlers.SearchSessionHandler)
 
-	return http.ListenAndServe(fmt.Sprintf(":%d", a.port), mux)
+	return r.Run(fmt.Sprintf(":%d", a.port))
 }
