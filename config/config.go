@@ -36,12 +36,8 @@ func GetConfig() *Config {
 }
 
 func (c *Config) loadConfig() error {
-	configPath := os.Getenv("CONFIG_PATH")
-	if configPath == "" {
-		configPath = "config/config.json"
-	}
-
-	file, err := os.Open(configPath)
+	// TODO: сменить путь
+	file, err := os.Open("/home/nktauserum/Документы/aisearch/config/config.json")
 	if err != nil {
 		return err
 	}
