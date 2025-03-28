@@ -114,6 +114,8 @@ func NewFormatXML() *FormatXML {
 
 	sources := `
 	Текст, нуждающийся в подтверждении. <link url="http://www.example.com/">[1]</link> <link url="http://www.example2.com/">[2]</link>
+
+	Не указывайте источники в конце ответа отдельным абзацем. 
 	`
 
 	return &FormatXML{design: design, sources: sources}

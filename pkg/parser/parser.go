@@ -2,6 +2,7 @@ package parser
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/mrusme/journalist/crawler"
@@ -10,6 +11,13 @@ import (
 )
 
 func ParseHTML(ctx context.Context, url string) (*shared.Website, error) {
+	select {
+	case <-ctx.Done():
+		fmt.Printf("context deadline: %s\n", url)
+		return nil, nil
+	default:
+	}
+
 	logger, _ := zap.NewProduction()
 	defer logger.Sync()
 
@@ -32,50 +40,6 @@ func ParseHTML(ctx context.Context, url string) (*shared.Website, error) {
 	page.Sitename = article.SiteName
 
 	return &page, nil
-}
-
-func processLinks(html string) string {
-	var builder strings.Builder
-	inLink := false
-	inText := false
-
-	for i := 0; i < len(html); i++ {
-		// Проверяем, открывается ли ссылка
-		if strings.HasPrefix(html[i:], "<a") {
-			inLink = true
-			// Находим конец тега <a>
-			for html[i] != '>' {
-				i++
-			}
-			i++ // Пропускаем '>'
-			continue
-		}
-
-		// Проверяем, закрывается ли ссылка
-		if inLink && strings.HasPrefix(html[i:], "</a>") {
-			inLink = false
-			// Пропускаем закрывающий тег </a>
-			for html[i] != '>' {
-				i++
-			}
-			continue
-		}
-
-		// Если мы находимся внутри ссылки, проверяем, есть ли текст
-		if inLink && html[i] != ' ' && html[i] != '\n' {
-			inText = true
-		}
-
-		// Если текст внутри ссылки найден, записываем его
-		if inText {
-			builder.WriteByte(html[i])
-		} else if !inLink {
-			// Записываем обычный текст вне ссылок
-			builder.WriteByte(html[i])
-		}
-	}
-
-	return builder.String()
 }
 
 func GetContent(ctx context.Context, url string) (shared.Website, error) {
