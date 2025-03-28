@@ -35,6 +35,9 @@ func (a *Application) Run() error {
 	// Уточняющие запросы в рамках текущей сессии поиска
 	r.POST("/api/v1/refine", handlers.RefineSearchHandler)
 
+	r.POST("/api/v1/stream", handlers.StreamHandler)
+	r.POST("/api/v1/fish", handlers.FishHandler)
+
 	// Получение истории поиска для конкретной сессии
 	// r.GET("/api/v1/search/:sessionId/history", mw.GinLogMiddleware(), handlers.SearchHistoryHandler)
 

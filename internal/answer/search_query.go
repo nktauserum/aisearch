@@ -14,24 +14,40 @@ import (
 	"github.com/nktauserum/aisearch/prompt"
 )
 
-func GetSearchInfo(question string) (string, error) {
-	//resultChan := make(chan []string, 1)
+type SearchInfo struct {
+	Topic   string
+	Queries []string
+}
 
+func GetSearchInfo(ctx context.Context, question string) (*SearchInfo, error) {
 	if question == "" {
-		return "", fmt.Errorf("question equals nil")
+		return nil, fmt.Errorf("question equals nil")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	conversation := client.NewConversation(prompt.SearchQuery())
 	result, err := conversation.Continue(ctx, models.Message{Text: question})
 	if err != nil {
 		log.Printf("error getting search queries: %v", err)
-		return "", nil
+		return nil, nil
 	}
 
-	return result, nil
+	contentTemp := strings.Split(result, ".")
+	if len(contentTemp) < 2 {
+		log.Printf("invalid search_info format: %s\n", result)
+		return nil, fmt.Errorf("invalid search_info format")
+	}
+
+	topic := contentTemp[0]
+	log.Printf("topic: %s\n", topic)
+	queries := strings.Split(contentTemp[1], ";")
+	log.Printf("queries: %s\n", queries)
+
+	content := SearchInfo{Topic: topic, Queries: queries}
+
+	return &content, nil
 }
 
 func GenerateRefineQueries(ctx context.Context, old_conversation *models.Conversation, query string) ([]string, error) {

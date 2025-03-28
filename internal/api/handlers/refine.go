@@ -55,7 +55,7 @@ func RefineSearchHandler(c *gin.Context) {
 	var builder strings.Builder
 	builder.WriteString(fmt.Sprintf("Запрос: %s\n\n", request.Query))
 	if queries != nil {
-		content, err := answer.Search(ctx, queries...)
+		content, err := answer.Search(ctx, answer.SearchInfo{Topic: conversation.Session.Topic, Queries: queries})
 		if err != nil {
 			mw.ErrorHandler(c, err, http.StatusInternalServerError)
 			return

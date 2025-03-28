@@ -62,6 +62,7 @@ func removeEmptyLinks(html string) string {
 }
 
 func GetContent(ctx context.Context, url string) (shared.Website, error) {
+	<-ctx.Done()
 
 	content, err := ParseHTML(ctx, url)
 	if err != nil {

@@ -13,7 +13,7 @@ import (
 	"github.com/nktauserum/aisearch/shared"
 )
 
-func Search(ctx context.Context, queries ...string) ([]shared.Website, error) {
+func ExtractInfo(ctx context.Context, queries ...string) ([]shared.Website, error) {
 	// Execute search queries
 	log.Println("ищем в интернете")
 	urls, err := DoSearchQueries(queries)
@@ -27,20 +27,19 @@ func Search(ctx context.Context, queries ...string) ([]shared.Website, error) {
 	defer cancel()
 
 	ch := make(chan shared.Website, len(urls))
-	urlChan := make(chan string, len(urls))
-
-	// Send URLs to the channel
-	for _, url := range urls {
-		urlChan <- url
-	}
-	close(urlChan)
 
 	var wg sync.WaitGroup
 	for _, url := range urls {
 		wg.Add(1)
 		go func(ctx context.Context, url string) {
 			defer wg.Done()
+			defer cancel()
 
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
 			// start := time.Now()
 			log.Printf("сайт %s\n", url)
 
@@ -50,13 +49,6 @@ func Search(ctx context.Context, queries ...string) ([]shared.Website, error) {
 				ch <- shared.Website{}
 				//log.Printf("done %s in %.3f\n", url, time.Since(start).Seconds())
 				return
-			}
-
-			select {
-			case <-ctx.Done():
-				log.Printf("content deadline exceeded: %s", url)
-				return
-			default:
 			}
 
 			ch <- siteInfo
