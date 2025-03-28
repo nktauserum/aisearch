@@ -91,3 +91,38 @@ func (f *FormatHTML) Design() string {
 func (f *FormatHTML) Sources() string {
 	return f.sources
 }
+
+type FormatXML struct {
+	design  string
+	sources string
+}
+
+func NewFormatXML() *FormatXML {
+	absPath, err := os.Getwd()
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+
+	info, err := os.ReadFile(fmt.Sprintf("%s/prompt/format/xml.md", absPath))
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+
+	design := string(info)
+
+	sources := `
+	Текст, нуждающийся в подтверждении. <link url="http://www.example.com/">[1]</link> <link url="http://www.example2.com/">[2]</link>
+	`
+
+	return &FormatXML{design: design, sources: sources}
+}
+
+func (f *FormatXML) Design() string {
+	return f.design
+}
+
+func (f *FormatXML) Sources() string {
+	return f.sources
+}

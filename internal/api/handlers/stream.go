@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -27,6 +28,13 @@ func StreamHandler(c *gin.Context) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
+
+	select {
+	case <-ctx.Done():
+		c.Status(http.StatusRequestTimeout)
+		return
+	default:
+	}
 
 	// Обрабатываем запрос пользователя
 	request := new(shared.SearchRequest)
@@ -59,6 +67,11 @@ func StreamHandler(c *gin.Context) {
 	}
 	log.Printf("Search completed: %v ms", time.Since(searchStart).Milliseconds())
 
+	if content == nil {
+		c.Status(http.StatusNoContent)
+		return
+	}
+
 	for _, query := range content {
 		c.SSEvent("source", query.URL)
 		if c.Writer.Status() != http.StatusOK {
@@ -78,7 +91,7 @@ func StreamHandler(c *gin.Context) {
 		builder.WriteString(fmt.Sprintf("\n\n### Title: %s\n#### URL: %s\n#### Название ресурса:%s\n#### Текст: %s\n", site.Title, site.URL, site.Sitename, site.Content))
 	}
 
-	parsemode := shared.NewFormatMD()
+	parsemode := shared.NewFormatXML()
 
 	result := make(chan string)
 	conversation := client.NewConversation(prompt.Research(parsemode))
@@ -114,6 +127,13 @@ func StreamHandler(c *gin.Context) {
 	}
 
 	c.SSEvent("info", string(session_json))
+
+	filename := fmt.Sprintf("content/summary_%d.md", time.Now().Unix())
+	err = os.WriteFile(filename, []byte(builder.String()), 0644)
+	if err != nil {
+		log.Printf("error writing summary to file: %v", err)
+	}
+	log.Printf("summary written to file: %s", filename)
 }
 
 func FishHandler(c *gin.Context) {

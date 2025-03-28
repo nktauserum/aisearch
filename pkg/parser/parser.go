@@ -10,7 +10,6 @@ import (
 )
 
 func ParseHTML(ctx context.Context, url string) (*shared.Website, error) {
-
 	logger, _ := zap.NewProduction()
 	defer logger.Sync()
 
@@ -28,56 +27,69 @@ func ParseHTML(ctx context.Context, url string) (*shared.Website, error) {
 
 	page.Title = article.Title
 	page.URL = url
-	page.HTML = removeEmptyLinks(article.ContentHtml)
+	//page.HTML = article.ContentHtml
+	page.Content = article.ContentText
 	page.Sitename = article.SiteName
 
 	return &page, nil
 }
 
-// removeEmptyLinks удаляет все ссылки, не содержащие текстовой информации
-func removeEmptyLinks(html string) string {
-	// Используем strings.Builder для эффективного построения строки
+func processLinks(html string) string {
 	var builder strings.Builder
 	inLink := false
 	inText := false
+
 	for i := 0; i < len(html); i++ {
+		// Проверяем, открывается ли ссылка
 		if strings.HasPrefix(html[i:], "<a") {
 			inLink = true
+			// Находим конец тега <a>
+			for html[i] != '>' {
+				i++
+			}
+			i++ // Пропускаем '>'
+			continue
 		}
+
+		// Проверяем, закрывается ли ссылка
 		if inLink && strings.HasPrefix(html[i:], "</a>") {
 			inLink = false
-			if !inText {
-				// Пропускаем пустую ссылку
-				i += len("</a>") - 1
-				continue
+			// Пропускаем закрывающий тег </a>
+			for html[i] != '>' {
+				i++
 			}
-			inText = false
+			continue
 		}
-		if inLink && !inText && html[i] != ' ' && html[i] != '\n' {
+
+		// Если мы находимся внутри ссылки, проверяем, есть ли текст
+		if inLink && html[i] != ' ' && html[i] != '\n' {
 			inText = true
 		}
-		builder.WriteByte(html[i])
+
+		// Если текст внутри ссылки найден, записываем его
+		if inText {
+			builder.WriteByte(html[i])
+		} else if !inLink {
+			// Записываем обычный текст вне ссылок
+			builder.WriteByte(html[i])
+		}
 	}
+
 	return builder.String()
 }
 
 func GetContent(ctx context.Context, url string) (shared.Website, error) {
-	<-ctx.Done()
+	select {
+	case <-ctx.Done():
+		return shared.Website{}, ctx.Err()
+	default:
+	}
 
 	content, err := ParseHTML(ctx, url)
 	if err != nil {
 		return shared.Website{}, err
 	}
 
-	// Удаляем все символы # для корректного отображения заголовков
-	content.HTML = strings.ReplaceAll(content.HTML, "#", "")
-
-	// Преобразуем HTML в Markdown
-	content.Content, err = HTMLtoMarkdown(&content.HTML)
-	if err != nil {
-		return shared.Website{}, err
-	}
-	// Удаляем лишние переносы строк
 	content.Content = strings.ReplaceAll(content.Content, "\n\n", "\n")
 
 	return *content, nil

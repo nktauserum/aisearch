@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"sync"
 	"time"
 
@@ -81,14 +80,6 @@ func Research(ctx context.Context, conversation *models.Conversation, content st
 	}
 
 	// Write summary to file
-	go func(context string) {
-		filename := fmt.Sprintf("content/summary_%d.md", time.Now().Unix())
-		err = os.WriteFile(filename, []byte(context), 0644)
-		if err != nil {
-			log.Printf("error writing summary to file: %v", err)
-		}
-		log.Printf("summary written to file: %s", filename)
-	}(content)
 
 	return summary, nil
 }

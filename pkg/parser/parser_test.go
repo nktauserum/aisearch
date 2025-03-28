@@ -9,7 +9,8 @@ import (
 func TestMakeReadable(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	raw_content, err := GetContent(ctx, "https://smlx.dev/posts/goodwe-sems-protocol-teardown/")
+
+	raw_content, err := GetContent(ctx, "https://habr.com/ru/companies/netologyru/articles/839436/")
 	if err != nil {
 		t.Fatal(err)
 	}
