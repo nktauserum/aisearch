@@ -61,7 +61,7 @@ func StreamHandler(c *gin.Context) {
 
 	searchStart := time.Now()
 	content, err := answer.Search(ctx, *search_info)
-	if err != nil {
+	if err != nil && err != ctx.Err() {
 		mw.ErrorHandler(c, err, http.StatusInternalServerError)
 		return
 	}

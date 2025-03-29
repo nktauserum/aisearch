@@ -99,7 +99,6 @@ func (c *Conversation) Stream(ctx context.Context, message Message, result chan 
 		defer response.Body.Close() // Закрываем тело ответа
 
 		reader := bufio.NewReader(response.Body)
-
 		for {
 			select {
 			case <-ctx.Done():
