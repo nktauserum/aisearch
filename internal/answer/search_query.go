@@ -31,7 +31,7 @@ func GetSearchInfo(ctx context.Context, question string) (*SearchInfo, error) {
 	result, err := conversation.Continue(ctx, models.Message{Text: question})
 	if err != nil {
 		log.Printf("error getting search queries: %v", err)
-		return nil, nil
+		return nil, err
 	}
 
 	contentTemp := strings.Split(result, ".")
