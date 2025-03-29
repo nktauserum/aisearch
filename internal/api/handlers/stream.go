@@ -102,7 +102,13 @@ func StreamHandler(c *gin.Context) {
 		return
 	}
 
+	DEBUG := true
+
 	for msg := range result {
+		if DEBUG {
+			fmt.Println(msg)
+		}
+
 		// Отправляем данные в формате Server-Sent Events
 		c.SSEvent("message", msg)
 		// Проверяем, не закрыт ли контекст

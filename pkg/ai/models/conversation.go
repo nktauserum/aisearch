@@ -125,13 +125,18 @@ func (c *Conversation) Stream(ctx context.Context, message Message, result chan 
 				}
 
 				if len(chunk.Choices) > 0 {
-					content, err := json.Marshal(Response{Content: chunk.Choices[0].Delta.Content})
+					content := chunk.Choices[0].Delta.Content
+					if content == "" {
+						continue
+					}
+
+					resp, err := json.Marshal(Response{Content: content})
 					if err != nil {
 						log.Printf("error marshalling response: %v", err)
 						return
 					}
 
-					result <- string(content)
+					result <- string(resp)
 				}
 			}
 		}
