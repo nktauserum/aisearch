@@ -8,17 +8,14 @@ import (
 )
 
 func Search(ctx context.Context, search_info SearchInfo) ([]shared.Website, error) {
-	ctx_timeout, cancel := context.WithTimeout(ctx, 20*time.Second)
+	// Устанавливаем таймаут для операции поиска
+	ctxTimeout, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 
-	content, err := ExtractInfo(ctx_timeout, search_info.Queries...)
+	// Получаем канал с результатами
+	websites, err := ExtractInfo(ctxTimeout, search_info.Queries...)
 	if err != nil {
 		return nil, err
-	}
-
-	websites := make([]shared.Website, len(content))
-	for site := range content {
-		websites = append(websites, site)
 	}
 
 	return websites, nil

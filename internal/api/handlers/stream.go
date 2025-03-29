@@ -40,13 +40,13 @@ func StreamHandler(c *gin.Context) {
 	request := new(shared.SearchRequest)
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
-		mw.ErrorHandler(c, err, http.StatusInternalServerError)
+		mw.ErrorStreamHandler(c, err, http.StatusInternalServerError)
 		return
 	}
 
 	err = json.Unmarshal(body, request)
 	if err != nil {
-		mw.ErrorHandler(c, err, http.StatusInternalServerError)
+		mw.ErrorStreamHandler(c, err, http.StatusInternalServerError)
 		return
 	}
 	log.Printf("request: %s\n", request.Query)
@@ -54,7 +54,7 @@ func StreamHandler(c *gin.Context) {
 	searchInfoStart := time.Now()
 	search_info, err := answer.GetSearchInfo(ctx, request.Query)
 	if err != nil {
-		mw.ErrorHandler(c, err, http.StatusInternalServerError)
+		mw.ErrorStreamHandler(c, err, http.StatusInternalServerError)
 		return
 	}
 	log.Printf("Fetched search info: %v ms", time.Since(searchInfoStart).Milliseconds())
@@ -62,7 +62,7 @@ func StreamHandler(c *gin.Context) {
 	searchStart := time.Now()
 	content, err := answer.Search(ctx, *search_info)
 	if err != nil && err != ctx.Err() {
-		mw.ErrorHandler(c, err, http.StatusInternalServerError)
+		mw.ErrorStreamHandler(c, err, http.StatusInternalServerError)
 		return
 	}
 	log.Printf("Search completed: %v ms", time.Since(searchStart).Milliseconds())
@@ -98,7 +98,7 @@ func StreamHandler(c *gin.Context) {
 	user_message := models.Message{Text: request.Query}
 	err = conversation.Stream(ctx, user_message, result)
 	if err != nil {
-		mw.ErrorHandler(c, err, http.StatusInternalServerError)
+		mw.ErrorStreamHandler(c, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -121,14 +121,14 @@ func StreamHandler(c *gin.Context) {
 	memory := client.GetMemory()
 	uuid, err := memory.NewConversation(ctx, conversation)
 	if err != nil {
-		mw.ErrorHandler(c, err, http.StatusInternalServerError)
+		mw.ErrorStreamHandler(c, err, http.StatusInternalServerError)
 		return
 	}
 
 	session := shared.SearchSession{UUID: uuid, Topic: search_info.Topic}
 	session_json, err := json.Marshal(session)
 	if err != nil {
-		mw.ErrorHandler(c, err, http.StatusInternalServerError)
+		mw.ErrorStreamHandler(c, err, http.StatusInternalServerError)
 		return
 	}
 

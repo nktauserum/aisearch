@@ -2,7 +2,6 @@ package answer
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -12,63 +11,78 @@ import (
 	"github.com/nktauserum/aisearch/shared"
 )
 
-func ExtractInfo(ctx context.Context, queries ...string) (chan shared.Website, error) {
-	// Execute search queries
-	log.Println("ищем в интернете")
+func ExtractInfo(ctx context.Context, queries ...string) ([]shared.Website, error) {
+	// Создаем контекст с timeout для всей операции
+	ctxTimeout, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+
+	log.Println("Ищем в интернете")
 	urls, err := DoSearchQueries(queries)
 	if err != nil {
-		fmt.Println(err)
+		log.Printf("Ошибка DoSearchQueries: %v", err)
 		return nil, err
 	}
 
-	// Create a timeout for the entire search
-	ctxWithTimeout, cancel := context.WithTimeout(ctx, 20*time.Second)
-	defer cancel()
+	log.Printf("Получено %d URL", len(urls))
 
-	ch := make(chan shared.Website, len(urls))
-	done := make(chan struct{})
+	// Канал для сбора результатов. Размер буфера равен количеству URL, чтобы избежать блокировок.
+	resultsCh := make(chan shared.Website, len(urls))
+	// Канал для сбора ошибок (необязательный, если требуется обработка ошибок)
+	errorCh := make(chan error, len(urls))
 
 	var wg sync.WaitGroup
-	log.Printf("Got %d urls", len(urls))
+
+	// Для каждого URL запускаем горутину.
 	for _, url := range urls {
+		// Чтобы переменная url не была переопределена в замыкании
+		url := url
 		wg.Add(1)
-		go func(ctx context.Context, url string) {
+		go func() {
 			defer wg.Done()
 
-			select {
-			case <-ctx.Done():
-				return
-			default:
-			}
-
-			siteInfo, err := parser.GetContent(ctx, url)
+			// Вызываем функцию получения контента с использованием ctxTimeout.
+			siteInfo, err := parser.GetContent(ctxTimeout, url)
 			if err != nil {
-				fmt.Println(err)
+				log.Printf("Ошибка получения контента для %s: %v", url, err)
+				// Можно отправлять ошибку на канал, если требуется дальнейшая обработка
+				errorCh <- err
 				return
 			}
 
-			select {
-			case <-ctx.Done():
-				return
-			case ch <- siteInfo:
-			}
-			log.Printf("сайт %s\n", url)
-		}(ctxWithTimeout, url)
+			log.Printf("Сайт %s обработан", url)
+			resultsCh <- siteInfo
+		}()
 	}
 
+	// Ожидаем завершения всех горутин в отдельной горутине,
+	// после чего закрываем канал результатов.
 	go func() {
 		wg.Wait()
-		close(ch)
-		done <- struct{}{}
+		close(resultsCh)
+		close(errorCh)
 	}()
 
-	select {
-	case <-ctxWithTimeout.Done():
-		close(ch) // Закрываем канал, чтобы не было утечки ресурсов
-		return ch, nil
-	case <-done:
-		return ch, nil
+	// Собираем результаты до окончания работы или таймаута.
+	var websites []shared.Website
+collectLoop:
+	for {
+		select {
+		case site, ok := <-resultsCh:
+			if !ok {
+				// Канал закрыт – собираем все результаты закончены.
+				break collectLoop
+			}
+			websites = append(websites, site)
+		case <-ctxTimeout.Done():
+			log.Println("Таймаут выполнения, возвращаем уже полученные результаты")
+			break collectLoop
+		}
 	}
+
+	// Если требуется возврат ошибки при наличии ошибок, можно объединить их
+	// или вернуть ошибку, если ни одного сайта не удалось получить.
+	// Здесь возвращаем только результаты.
+	return websites, nil
 }
 
 // Даёт ответ на запрос по переданному контенту
