@@ -95,7 +95,7 @@ func StreamHandler(c *gin.Context) {
 
 	result := make(chan string)
 	conversation := client.NewConversation(prompt.Research(parsemode))
-	user_message := models.Message{Text: request.Query}
+	user_message := models.Message{Text: builder.String()}
 	err = conversation.Stream(ctx, user_message, result)
 	if err != nil {
 		mw.ErrorStreamHandler(c, err, http.StatusInternalServerError)
