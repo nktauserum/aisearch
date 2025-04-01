@@ -22,9 +22,10 @@ import (
 
 func StreamHandler(c *gin.Context) {
 	// Устанавливаем заголовки для потока
-	c.Header("Content-Type", "text/event-stream")
-	c.Header("Cache-Control", "no-cache")
-	c.Header("Connection", "keep-alive")
+	c.Writer.Header().Set("Content-Type", "text/event-stream")
+	c.Writer.Header().Set("Cache-Control", "no-cache")
+	c.Writer.Header().Set("Connection", "keep-alive")
+	c.Writer.Header().Set("Transfer-Encoding", "chunked")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
@@ -72,13 +73,14 @@ func StreamHandler(c *gin.Context) {
 		return
 	}
 
-	for _, query := range content {
-		c.SSEvent("source", query.URL)
-		if c.Writer.Status() != http.StatusOK {
-			ctx.Done()
-			return
+	c.Writer.Flush()
+
+	c.Stream(func(w io.Writer) bool {
+		for _, site := range content {
+			c.SSEvent("source", site.URL)
 		}
-	}
+		return false
+	})
 
 	var builder strings.Builder
 	builder.WriteString(fmt.Sprintf("# Запрос: %s\n# Topic:%s\n# Search queries: [", request.Query, search_info.Topic))
@@ -102,21 +104,18 @@ func StreamHandler(c *gin.Context) {
 		return
 	}
 
-	DEBUG := true
-
-	for msg := range result {
-		if DEBUG {
-			fmt.Println(msg)
+	c.Stream(func(w io.Writer) bool {
+		select {
+		case msg, ok := <-result:
+			if !ok {
+				return false
+			}
+			c.SSEvent("message", msg)
+			return true
+		case <-c.Request.Context().Done():
+			return false
 		}
-
-		// Отправляем данные в формате Server-Sent Events
-		c.SSEvent("message", msg)
-		// Проверяем, не закрыт ли контекст
-		if c.Writer.Status() != http.StatusOK {
-			ctx.Done()
-			return
-		}
-	}
+	})
 
 	memory := client.GetMemory()
 	uuid, err := memory.NewConversation(ctx, conversation)

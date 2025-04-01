@@ -36,8 +36,15 @@ func ParseHTML(ctx context.Context, url string) (*shared.Website, error) {
 	page.Title = article.Title
 	page.URL = url
 	//page.HTML = article.ContentHtml
-	page.Content = article.ContentText
+	//	page.Content = article.ContentText
 	page.Sitename = article.SiteName
+
+	const maxLength = 20000
+	if len(article.ContentText) > maxLength {
+		page.Content = article.ContentText[:maxLength]
+	} else {
+		page.Content = article.ContentText
+	}
 
 	return &page, nil
 }
